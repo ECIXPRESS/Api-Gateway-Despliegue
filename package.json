@@ -1,0 +1,27 @@
+{
+  "name": "api-gateway-render",
+  "version": "1.0.0",
+  "description": "API Gateway for microservices deployed on Render + Azure",
+  "main": "gateway-multiple-services.js",
+  "scripts": {
+    "start": "node gateway-multiple-services.js",
+    "dev": "nodemon gateway-multiple-services.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "api-gateway",
+    "microservices",
+    "render",
+    "azure"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^2.0.6",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
