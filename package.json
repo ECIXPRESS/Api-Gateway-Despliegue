@@ -1,0 +1,25 @@
+{
+  "name": "api-gateway",
+  "version": "1.0.0",
+  "description": "API Gateway for microservices",
+  "main": "gateway-multiple-services.js",
+  "scripts": {
+    "start": "node gateway-multiple-services.js",
+    "dev": "nodemon gateway-multiple-services.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^2.0.6",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "api-gateway",
+    "microservices",
+    "proxy"
+  ],
+  "author": "ECI-EXPRESS",
+  "license": "MIT"
+}
