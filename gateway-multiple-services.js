@@ -181,17 +181,17 @@ const createProxyOptions = (serviceName, target) => ({
     }
 });
 
-// PROXY PARA GESTIÓN DE USUARIOS
+// PROXY PARA GESTIÓN DE USUARIOS - CORREGIDO
 if (validatedServices.usuarios) {
     app.use('/api/users', createProxyMiddleware({
         ...createProxyOptions('USERS', validatedServices.usuarios),
         pathRewrite: {
-            '^/api/users': '/users'
+            '^/api/users': ''  // ✅ CORREGIDO - elimina /api/users completamente
         },
         onProxyReq: (proxyReq, req, res) => {
             console.log(`[GATEWAY-USERS] === PROXY USERS DETALLADO ===`);
             console.log(`[GATEWAY-USERS] Original URL: ${req.originalUrl}`);
-            console.log(`[GATEWAY-USERS] Rewritten URL: /users${req.url.replace('/api/users', '')}`);
+            console.log(`[GATEWAY-USERS] Rewritten URL: ${req.url.replace('/api/users', '')}`);
 
             proxyReq.removeHeader('expect');
             proxyReq.removeHeader('Expect');
@@ -221,14 +221,14 @@ if (validatedServices.autenticacion) {
     app.use('/api/auth', createProxyMiddleware({
         ...createProxyOptions('AUTH', validatedServices.autenticacion),
         pathRewrite: {
-            '^/api/auth': '/auth'
+            '^/api/auth': ''  // ✅ Elimina /api/auth completamente
         }
     }));
 
     app.use('/api/user-info', createProxyMiddleware({
         ...createProxyOptions('USER-INFO', validatedServices.autenticacion),
         pathRewrite: {
-            '^/api/user-info': '/user-info'
+            '^/api/user-info': ''  // ✅ Elimina /api/user-info completamente
         }
     }));
     console.log('✅ Proxy AUTH configurado');
@@ -256,9 +256,12 @@ app.get('/config', (req, res) => {
             'POST /api/auth/login': 'Iniciar sesión',
             'POST /api/auth/refresh': 'Refrescar token',
             'GET /api/user-info': 'Obtener información del usuario',
+            'GET /api/users/credentials/{email}': 'Obtener credenciales de usuario',
+            'GET /api/users/credentials/auth': 'Validar credenciales',
+            'GET /api/users/{userId}/credentials': 'Obtener usuario por ID',
             'POST /api/users': 'Crear usuario',
-            'GET /api/users/:id': 'Obtener usuario por ID',
-            'PUT /api/users/:id': 'Actualizar usuario',
+            'GET /api/users/{id}': 'Obtener usuario por ID',
+            'PUT /api/users/{id}': 'Actualizar usuario',
             'POST /api/users/password/reset-request': 'Solicitar reset de password',
             'POST /api/users/password/verify-code': 'Verificar código',
             'PUT /api/users/password/reset': 'Resetear password'
@@ -297,9 +300,12 @@ app.get('/', (req, res) => {
             'POST /api/auth/login',
             'POST /api/auth/refresh',
             'GET /api/user-info',
+            'GET /api/users/credentials/{email}',
+            'GET /api/users/credentials/auth',
+            'GET /api/users/{userId}/credentials',
             'POST /api/users',
-            'GET /api/users/:id',
-            'PUT /api/users/:id',
+            'GET /api/users/{id}',
+            'PUT /api/users/{id}',
             'POST /api/users/password/reset-request',
             'POST /api/users/password/verify-code',
             'PUT /api/users/password/reset'
@@ -340,7 +346,7 @@ app.use('*', (req, res) => {
 
 app.listen(GATEWAY_PORT, '0.0.0.0', () => {
     console.log('=========================================');
-    console.log('🚀 GATEWAY INICIADO - SERVICIOS OPTIMIZADOS');
+    console.log('🚀 GATEWAY INICIADO - PATH REWRITE CORREGIDO');
     console.log('=========================================');
     console.log(`URL: https://api-gateway-despliegue.onrender.com`);
     console.log('Environment:', process.env.NODE_ENV || 'production');
@@ -356,9 +362,12 @@ app.listen(GATEWAY_PORT, '0.0.0.0', () => {
     console.log('- POST   /api/auth/login');
     console.log('- POST   /api/auth/refresh');
     console.log('- GET    /api/user-info');
+    console.log('- GET    /api/users/credentials/{email}');
+    console.log('- GET    /api/users/credentials/auth');
+    console.log('- GET    /api/users/{userId}/credentials');
     console.log('- POST   /api/users');
-    console.log('- GET    /api/users/:id');
-    console.log('- PUT    /api/users/:id');
+    console.log('- GET    /api/users/{id}');
+    console.log('- PUT    /api/users/{id}');
     console.log('- POST   /api/users/password/reset-request');
     console.log('- POST   /api/users/password/verify-code');
     console.log('- PUT    /api/users/password/reset');
