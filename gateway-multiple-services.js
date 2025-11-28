@@ -5,7 +5,6 @@ const cors = require('cors');
 const app = express();
 const GATEWAY_PORT = process.env.PORT || 8081;
 
-// Configuración CORS más permisiva
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -14,10 +13,8 @@ app.use(cors({
     credentials: true
 }));
 
-// Manejar preflight OPTIONS requests globalmente
 app.options('*', cors());
 
-// MIDDLEWARE CRÍTICO: Eliminar header Expect que causa problemas
 app.use((req, res, next) => {
     if (req.headers['expect'] || req.headers['expect'] === '100-continue') {
         console.log('[GATEWAY] Eliminando header Expect problemático');
@@ -31,7 +28,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Body parsing middleware
 app.use(express.json({
     limit: '10mb',
     verify: (req, res, buf) => {
@@ -50,13 +46,11 @@ app.use(express.urlencoded({
     limit: '10mb'
 }));
 
-// CONFIGURACIÓN DE SERVICIOS - SOLO LOS QUE FUNCIONAN
 const services = {
     usuarios: process.env.USERS_SERVICE_URL || 'https://tsukuyomi-users-dev-f2dzeqangrebakdw.eastus2-01.azurewebsites.net',
     autenticacion: process.env.AUTH_SERVICE_URL || 'https://tsukuyomi-authentication-dev-h9ajhmhre8gxhzcp.eastus2-01.azurewebsites.net'
 };
 
-// Validar URLs críticas
 const validateServiceUrl = (url, serviceName) => {
     if (!url || url.includes('tu-') || url.includes('localhost')) {
         console.warn(`⚠️  Servicio ${serviceName} no configurado: ${url}`);
@@ -65,7 +59,6 @@ const validateServiceUrl = (url, serviceName) => {
     return url;
 };
 
-// Servicios validados
 const validatedServices = {
     usuarios: validateServiceUrl(services.usuarios, 'USERS'),
     autenticacion: validateServiceUrl(services.autenticacion, 'AUTH')
@@ -82,7 +75,6 @@ Object.entries(validatedServices).forEach(([key, value]) => {
 });
 console.log('=========================================');
 
-// Log de peticiones detallado
 app.use((req, res, next) => {
     console.log('[GATEWAY] ======== NUEVA PETICIÓN ========');
     console.log(`[GATEWAY] ${req.method} ${req.originalUrl}`);
@@ -97,7 +89,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Health check
 app.get('/health', (req, res) => {
     const activeServices = {};
     Object.entries(validatedServices).forEach(([key, value]) => {
@@ -114,7 +105,6 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Configuración para proxies
 const createProxyOptions = (serviceName, target) => ({
     target: target,
     changeOrigin: true,
@@ -181,12 +171,11 @@ const createProxyOptions = (serviceName, target) => ({
     }
 });
 
-// PROXY PARA GESTIÓN DE USUARIOS - CORREGIDO
 if (validatedServices.usuarios) {
     app.use('/api/users', createProxyMiddleware({
         ...createProxyOptions('USERS', validatedServices.usuarios),
         pathRewrite: {
-            '^/api/users': ''  // ✅ CORREGIDO - elimina /api/users completamente
+            '^/api/users': ''
         },
         onProxyReq: (proxyReq, req, res) => {
             console.log(`[GATEWAY-USERS] === PROXY USERS DETALLADO ===`);
@@ -216,19 +205,18 @@ if (validatedServices.usuarios) {
     console.log('❌ Proxy USERS NO configurado - URL no válida');
 }
 
-// PROXY PARA AUTENTICACIÓN
 if (validatedServices.autenticacion) {
     app.use('/api/auth', createProxyMiddleware({
         ...createProxyOptions('AUTH', validatedServices.autenticacion),
         pathRewrite: {
-            '^/api/auth': ''  // ✅ Elimina /api/auth completamente
+            '^/api/auth': ''
         }
     }));
 
     app.use('/api/user-info', createProxyMiddleware({
         ...createProxyOptions('USER-INFO', validatedServices.autenticacion),
         pathRewrite: {
-            '^/api/user-info': ''  // ✅ Elimina /api/user-info completamente
+            '^/api/user-info': ''
         }
     }));
     console.log('✅ Proxy AUTH configurado');
@@ -236,7 +224,6 @@ if (validatedServices.autenticacion) {
     console.log('❌ Proxy AUTH NO configurado - URL no válida');
 }
 
-// Ruta para verificar configuración
 app.get('/config', (req, res) => {
     const activeServices = {};
     Object.entries(validatedServices).forEach(([key, value]) => {
@@ -270,7 +257,6 @@ app.get('/config', (req, res) => {
     });
 });
 
-// Ruta para test de proxy
 app.get('/api/test-proxy', (req, res) => {
     const activeServices = {};
     Object.entries(validatedServices).forEach(([key, value]) => {
@@ -284,7 +270,6 @@ app.get('/api/test-proxy', (req, res) => {
     });
 });
 
-// Ruta principal
 app.get('/', (req, res) => {
     const activeServices = {};
     Object.entries(validatedServices).forEach(([key, value]) => {
@@ -314,7 +299,6 @@ app.get('/', (req, res) => {
     });
 });
 
-// Middleware para log de errores
 app.use((err, req, res, next) => {
     console.error('[GATEWAY] Error no manejado:', err);
     console.error('[GATEWAY] Error stack:', err.stack);
@@ -326,7 +310,6 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Manejo de rutas no encontradas
 app.use('*', (req, res) => {
     console.log(`[GATEWAY] Ruta no encontrada: ${req.originalUrl}`);
     res.status(404).json({
