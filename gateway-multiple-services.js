@@ -48,35 +48,23 @@ app.use(express.urlencoded({
 
 const services = {
     usuarios: process.env.USERS_SERVICE_URL || 'https://tsukuyomi-users-dev-f2dzeqangrebakdw.eastus2-01.azurewebsites.net',
-    autenticacion: process.env.AUTH_SERVICE_URL || 'https://tsukuyomi-authentication-dev-h9ajhmhre8gxhzcp.eastus2-01.azurewebsites.net'
+    autenticacion: process.env.AUTH_SERVICE_URL || 'https://tsukuyomi-authentication-dev-h9ajhmhre8gxhzcp.eastus2-01.azurewebsites.net',
+    notificaciones: process.env.NOTIFICATIONS_SERVICE_URL || 'https://tsukuyomi-notifications-dev-gmctdechaqf5fqaj.eastus2-01.azurewebsites.net',
+    chat: process.env.CHAT_SERVICE_URL || 'http://localhost:8084',
+    pagos: process.env.PAYMENTS_SERVICE_URL || 'http://localhost:8085'
 };
 
-const validateServiceUrl = (url, serviceName) => {
-    if (!url || url.includes('tu-') || url.includes('localhost')) {
-        console.warn(`⚠️  Servicio ${serviceName} no configurado: ${url}`);
-        return null;
-    }
-    return url;
-};
-
-const validatedServices = {
-    usuarios: validateServiceUrl(services.usuarios, 'USERS'),
-    autenticacion: validateServiceUrl(services.autenticacion, 'AUTH')
-};
-
-console.log('🎯 CONFIGURACIÓN DE SERVICIOS ACTIVOS:');
+console.log('🎯 CONFIGURACIÓN DE SERVICIOS AZURE:');
 console.log('=========================================');
-Object.entries(validatedServices).forEach(([key, value]) => {
-    if (value) {
-        console.log(`✅ ${key.toUpperCase()}: ${value}`);
-    } else {
-        console.log(`❌ ${key.toUpperCase()}: NO CONFIGURADO`);
-    }
-});
+console.log('- Usuarios:', services.usuarios);
+console.log('- Autenticación:', services.autenticacion);
+console.log('- Notificaciones:', services.notificaciones);
+console.log('- Chat:', services.chat);
+console.log('- Pagos:', services.pagos);
 console.log('=========================================');
 
 app.use((req, res, next) => {
-    console.log('[GATEWAY] ======== NUEVA PETICIÓN ========');
+    console.log(`\n[GATEWAY] ======== NUEVA PETICIÓN ========`);
     console.log(`[GATEWAY] ${req.method} ${req.originalUrl}`);
     console.log(`[GATEWAY] Headers:`, JSON.stringify(req.headers, null, 2));
 
@@ -90,17 +78,11 @@ app.use((req, res, next) => {
 });
 
 app.get('/health', (req, res) => {
-    const activeServices = {};
-    Object.entries(validatedServices).forEach(([key, value]) => {
-        if (value) activeServices[key] = value;
-    });
-
     res.json({
         status: 'Gateway funcionando',
         port: GATEWAY_PORT,
         environment: process.env.NODE_ENV || 'production',
-        services_active: Object.keys(activeServices).length,
-        microservicios: activeServices,
+        microservicios: services,
         timestamp: new Date().toISOString()
     });
 });
@@ -171,129 +153,191 @@ const createProxyOptions = (serviceName, target) => ({
     }
 });
 
-if (validatedServices.usuarios) {
-    app.use('/api/users', createProxyMiddleware({
-        ...createProxyOptions('USERS', validatedServices.usuarios),
-        pathRewrite: {
-            '^/api/users': ''
-        },
-        onProxyReq: (proxyReq, req, res) => {
-            console.log(`[GATEWAY-USERS] === PROXY USERS DETALLADO ===`);
-            console.log(`[GATEWAY-USERS] Original URL: ${req.originalUrl}`);
-            console.log(`[GATEWAY-USERS] Rewritten URL: ${req.url.replace('/api/users', '')}`);
+app.use('/api/users', createProxyMiddleware({
+    ...createProxyOptions('USERS', services.usuarios),
+    pathRewrite: {
+        '^/api/users': ''
+    },
+    onProxyReq: (proxyReq, req, res) => {
+        console.log(`[GATEWAY-USERS] === PROXY USERS DETALLADO ===`);
+        console.log(`[GATEWAY-USERS] Original URL: ${req.originalUrl}`);
+        console.log(`[GATEWAY-USERS] Rewritten URL: ${req.url.replace('/api/users', '')}`);
 
-            proxyReq.removeHeader('expect');
-            proxyReq.removeHeader('Expect');
+        proxyReq.removeHeader('expect');
+        proxyReq.removeHeader('Expect');
 
-            if (req.body) {
-                console.log(`[GATEWAY-USERS] Body recibido:`, JSON.stringify(req.body, null, 2));
+        if (req.body) {
+            console.log(`[GATEWAY-USERS] Body recibido:`, JSON.stringify(req.body, null, 2));
 
-                const bodyData = JSON.stringify(req.body);
-                if (bodyData && bodyData !== '{}') {
-                    proxyReq.setHeader('Content-Type', 'application/json');
-                    proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-                    proxyReq.write(bodyData);
-                    console.log(`[GATEWAY-USERS] Body enviado: ${bodyData}`);
-                }
+            const bodyData = JSON.stringify(req.body);
+            if (bodyData && bodyData !== '{}') {
+                proxyReq.setHeader('Content-Type', 'application/json');
+                proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+                proxyReq.write(bodyData);
+                console.log(`[GATEWAY-USERS] Body enviado: ${bodyData}`);
             }
-
-            console.log(`[GATEWAY-USERS] Headers finales:`, JSON.stringify(proxyReq.getHeaders(), null, 2));
         }
-    }));
-    console.log('✅ Proxy USERS configurado');
-} else {
-    console.log('❌ Proxy USERS NO configurado - URL no válida');
-}
 
-if (validatedServices.autenticacion) {
-    app.use('/api/auth', createProxyMiddleware({
-        ...createProxyOptions('AUTH', validatedServices.autenticacion),
-        pathRewrite: {
-            '^/api/auth': ''
-        }
-    }));
+        console.log(`[GATEWAY-USERS] Headers finales:`, JSON.stringify(proxyReq.getHeaders(), null, 2));
+    }
+}));
 
-    app.use('/api/user-info', createProxyMiddleware({
-        ...createProxyOptions('USER-INFO', validatedServices.autenticacion),
-        pathRewrite: {
-            '^/api/user-info': ''
+app.use('/api/auth', createProxyMiddleware({
+    ...createProxyOptions('AUTH', services.autenticacion),
+    pathRewrite: {
+        '^/api/auth': ''
+    }
+}));
+
+app.use('/api/user-info', createProxyMiddleware({
+    ...createProxyOptions('USER-INFO', services.autenticacion),
+    pathRewrite: {
+        '^/api/user-info': ''
+    }
+}));
+
+app.use('/api/notifications', createProxyMiddleware({
+    ...createProxyOptions('NOTIFICATIONS', services.notificaciones),
+    pathRewrite: {
+        '^/api/notifications': ''
+    }
+}));
+
+app.use('/api/chat', createProxyMiddleware({
+    ...createProxyOptions('CHAT', services.chat),
+    pathRewrite: {
+        '^/api/chat': ''
+    },
+    onProxyReq: (proxyReq, req, res) => {
+        console.log(`[GATEWAY-CHAT] === PROXY CHAT DETALLADO ===`);
+        console.log(`[GATEWAY-CHAT] Original URL: ${req.originalUrl}`);
+        console.log(`[GATEWAY-CHAT] Rewritten URL: ${req.url.replace('/api/chat', '')}`);
+
+        proxyReq.removeHeader('expect');
+        proxyReq.removeHeader('Expect');
+
+        if (req.body) {
+            console.log(`[GATEWAY-CHAT] Body recibido:`, JSON.stringify(req.body, null, 2));
+
+            const bodyData = JSON.stringify(req.body);
+            if (bodyData && bodyData !== '{}') {
+                proxyReq.setHeader('Content-Type', 'application/json');
+                proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+                proxyReq.write(bodyData);
+                console.log(`[GATEWAY-CHAT] Body enviado: ${bodyData}`);
+            }
         }
-    }));
-    console.log('✅ Proxy AUTH configurado');
-} else {
-    console.log('❌ Proxy AUTH NO configurado - URL no válida');
-}
+
+        console.log(`[GATEWAY-CHAT] Headers finales:`, JSON.stringify(proxyReq.getHeaders(), null, 2));
+    }
+}));
+
+app.use('/api/payments', createProxyMiddleware({
+    ...createProxyOptions('PAYMENTS', services.pagos),
+    pathRewrite: {
+        '^/api/payments': '/api/v1/payments'
+    },
+    onProxyReq: (proxyReq, req, res) => {
+        console.log(`[GATEWAY-PAYMENTS] === PROXY PAYMENTS DETALLADO ===`);
+        console.log(`[GATEWAY-PAYMENTS] Original URL: ${req.originalUrl}`);
+        console.log(`[GATEWAY-PAYMENTS] Rewritten URL: /api/v1/payments${req.url.replace('/api/payments', '')}`);
+
+        proxyReq.removeHeader('expect');
+        proxyReq.removeHeader('Expect');
+
+        if (req.body) {
+            console.log(`[GATEWAY-PAYMENTS] Body recibido:`, JSON.stringify(req.body, null, 2));
+
+            const bodyData = JSON.stringify(req.body);
+            if (bodyData && bodyData !== '{}') {
+                proxyReq.setHeader('Content-Type', 'application/json');
+                proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+                proxyReq.write(bodyData);
+                console.log(`[GATEWAY-PAYMENTS] Body enviado: ${bodyData}`);
+            }
+        }
+
+        console.log(`[GATEWAY-PAYMENTS] Headers finales:`, JSON.stringify(proxyReq.getHeaders(), null, 2));
+    }
+}));
 
 app.get('/config', (req, res) => {
-    const activeServices = {};
-    Object.entries(validatedServices).forEach(([key, value]) => {
-        if (value) activeServices[key] = value;
-    });
-
     res.json({
         gateway: {
             port: GATEWAY_PORT,
             environment: process.env.NODE_ENV || 'production',
             deployed: true,
-            platform: 'Render + Azure',
-            services_active: Object.keys(activeServices).length
+            platform: 'Render + Azure'
         },
-        services: activeServices,
-        endpoints_activos: {
-            'POST /api/auth/login': 'Iniciar sesión',
-            'POST /api/auth/refresh': 'Refrescar token',
-            'GET /api/user-info': 'Obtener información del usuario',
-            'GET /api/users/credentials/{email}': 'Obtener credenciales de usuario',
-            'GET /api/users/credentials/auth': 'Validar credenciales',
-            'GET /api/users/{userId}/credentials': 'Obtener usuario por ID',
-            'POST /api/users': 'Crear usuario',
-            'GET /api/users/{id}': 'Obtener usuario por ID',
-            'PUT /api/users/{id}': 'Actualizar usuario',
-            'POST /api/users/password/reset-request': 'Solicitar reset de password',
+        services: services,
+        passwordResetEndpoints: {
+            'POST /api/users/password/reset-request': 'Solicitar código de verificación',
             'POST /api/users/password/verify-code': 'Verificar código',
-            'PUT /api/users/password/reset': 'Resetear password'
+            'PUT /api/users/password/reset': 'Cambiar contraseña'
+        },
+        customerEndpoints: {
+            'POST /api/users/customers': 'Crear customer',
+            'GET /api/users/customers/:customerId': 'Obtener customer por ID',
+            'PUT /api/users/customers/:customerId/password': 'Actualizar password',
+            'PUT /api/users/customers/:customerId': 'Actualizar customer',
+            'DELETE /api/users/customers/:customerId': 'Eliminar customer'
+        },
+        chatEndpoints: {
+            'POST /api/chat/eciexpress/conversations': 'Crear conversación',
+            'DELETE /api/chat/eciexpress/conversations': 'Eliminar conversación',
+            'GET /api/chat/eciexpress/conversations/{id}/messages': 'Obtener mensajes de conversación',
+            'GET /api/chat/eciexpress/chatuser/{id}/filter/contacts': 'Filtrar contactos',
+            'GET /api/chat/eciexpress/chatuser/{id}/contacts': 'Obtener contactos',
+            'GET /api/chat/eciexpress/chatuser/{id}/messages': 'Obtener mensajes en conversación',
+            'GET /api/chat/eciexpress/chatuser/{id}/conversations': 'Obtener conversaciones del usuario',
+            'POST /api/chat/eciexpress/chatuser/add-contact': 'Agregar contacto',
+            'POST /api/chat/eciexpress/chatuser/create-test-users': 'Crear usuarios de prueba (TEST)'
+        },
+        paymentEndpoints: {
+            'POST /api/payments/ProcessPayment': 'Procesar un nuevo pago'
         },
         timestamp: new Date().toISOString()
     });
 });
 
 app.get('/api/test-proxy', (req, res) => {
-    const activeServices = {};
-    Object.entries(validatedServices).forEach(([key, value]) => {
-        if (value) activeServices[key] = value;
-    });
-
     res.json({
         message: 'Test de proxy exitoso',
-        services: activeServices,
+        services: services,
         timestamp: new Date().toISOString()
     });
 });
 
 app.get('/', (req, res) => {
-    const activeServices = {};
-    Object.entries(validatedServices).forEach(([key, value]) => {
-        if (value) activeServices[key] = value;
-    });
-
     res.json({
-        message: 'Gateway funcionando - SERVICIOS USERS Y AUTH ACTIVOS',
+        message: 'Gateway funcionando - SERVICIOS AZURE ACTIVOS',
         environment: process.env.NODE_ENV || 'production',
-        services_active: Object.keys(activeServices).length,
-        microservicios: activeServices,
-        endpoints: [
-            'POST /api/auth/login',
-            'POST /api/auth/refresh',
-            'GET /api/user-info',
-            'GET /api/users/credentials/{email}',
-            'GET /api/users/credentials/auth',
-            'GET /api/users/{userId}/credentials',
-            'POST /api/users',
-            'GET /api/users/{id}',
-            'PUT /api/users/{id}',
+        microservicios: services,
+        passwordResetEndpoints: [
             'POST /api/users/password/reset-request',
             'POST /api/users/password/verify-code',
             'PUT /api/users/password/reset'
+        ],
+        customerEndpoints: [
+            'POST /api/users/customers',
+            'GET /api/users/customers/:customerId',
+            'PUT /api/users/customers/:customerId/password',
+            'PUT /api/users/customers/:customerId',
+            'DELETE /api/users/customers/:customerId'
+        ],
+        chatEndpoints: [
+            'POST /api/chat/eciexpress/conversations',
+            'DELETE /api/chat/eciexpress/conversations',
+            'GET /api/chat/eciexpress/conversations/:id/messages',
+            'GET /api/chat/eciexpress/chatuser/:id/filter/contacts',
+            'GET /api/chat/eciexpress/chatuser/:id/contacts',
+            'GET /api/chat/eciexpress/chatuser/:id/messages',
+            'GET /api/chat/eciexpress/chatuser/:id/conversations',
+            'POST /api/chat/eciexpress/chatuser/add-contact',
+            'POST /api/chat/eciexpress/chatuser/create-test-users'
+        ],
+        paymentEndpoints: [
+            'POST /api/payments/ProcessPayment'
         ],
         timestamp: new Date().toISOString()
     });
@@ -319,6 +363,9 @@ app.use('*', (req, res) => {
             '/api/auth/*',
             '/api/user-info/*',
             '/api/users/*',
+            '/api/notifications/*',
+            '/api/chat/*',
+            '/api/payments/*',
             '/health',
             '/config',
             '/api/test-proxy'
@@ -329,31 +376,21 @@ app.use('*', (req, res) => {
 
 app.listen(GATEWAY_PORT, '0.0.0.0', () => {
     console.log('=========================================');
-    console.log('🚀 GATEWAY INICIADO - PATH REWRITE CORREGIDO');
+    console.log('🚀 GATEWAY AZURE - SERVICIOS ACTIVOS');
     console.log('=========================================');
     console.log(`URL: https://api-gateway-despliegue.onrender.com`);
     console.log('Environment:', process.env.NODE_ENV || 'production');
-    console.log('Servicios activos:');
-
-    Object.entries(validatedServices).forEach(([key, value]) => {
-        if (value) {
-            console.log(`✅ ${key.toUpperCase()}: ${value}`);
-        }
-    });
-
+    console.log('Microservicios Azure configurados:');
+    console.log(`- Usuarios: ${services.usuarios}`);
+    console.log(`- Autenticación: ${services.autenticacion}`);
+    console.log(`- Notificaciones: ${services.notificaciones}`);
+    console.log(`- Chat: ${services.chat}`);
+    console.log(`- Pagos: ${services.pagos}`);
     console.log('Endpoints disponibles:');
-    console.log('- POST   /api/auth/login');
-    console.log('- POST   /api/auth/refresh');
-    console.log('- GET    /api/user-info');
     console.log('- GET    /api/users/credentials/{email}');
-    console.log('- GET    /api/users/credentials/auth');
-    console.log('- GET    /api/users/{userId}/credentials');
-    console.log('- POST   /api/users');
-    console.log('- GET    /api/users/{id}');
-    console.log('- PUT    /api/users/{id}');
-    console.log('- POST   /api/users/password/reset-request');
-    console.log('- POST   /api/users/password/verify-code');
-    console.log('- PUT    /api/users/password/reset');
+    console.log('- POST   /api/auth/login');
+    console.log('- GET    /api/user-info');
+    console.log('- POST   /api/notifications');
     console.log('=========================================');
 });
 
