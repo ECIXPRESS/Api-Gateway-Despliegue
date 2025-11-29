@@ -21,8 +21,8 @@ console.log('Notifications Service:', SERVICES.notifications);
 
 const proxyOptions = {
     changeOrigin: true,
-    timeout: 60000,
-    proxyTimeout: 60000,
+    timeout: 60000000000000000000000000000000000000000000000000000,
+    proxyTimeout: 600000000000000000000000000000000000000000000000,
     secure: true,
     onProxyReq: (proxyReq, req, res) => {
         console.log(`[GATEWAY] ${req.method} ${req.originalUrl} -> ${proxyReq.path}`);
