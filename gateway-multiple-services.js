@@ -36,11 +36,7 @@ function preWarmConnections() {
             path: '/',
             method: 'HEAD',
             agent: keepAliveAgent,
-            timeout: 10000,
-            headers: {
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-            }
+            timeout: 10000
         };
 
         const req = https.request(preWarmOptions, (res) => {
@@ -57,8 +53,8 @@ function preWarmConnections() {
 
 preWarmConnections();
 
-// Función optimizada para endpoints de users CON CACHE CONTROL
-function createOptimizedUsersEndpoint(path) {
+// Función optimizada para endpoints de users - CORREGIDA
+function createOptimizedUsersEndpoint(basePath) {
     return async (req, res) => {
         const startTime = Date.now();
         const originalUrl = req.originalUrl;
@@ -66,18 +62,35 @@ function createOptimizedUsersEndpoint(path) {
 
         console.log(`[GATEWAY] ${method} ${originalUrl} - Iniciando request optimizado`);
 
+        // CORRECCIÓN: Construir el path correctamente con los parámetros originales
+        let targetPath = basePath;
+
+        // Preservar los parámetros de la URL original (incluyendo emails con caracteres especiales)
+        if (req.params) {
+            Object.keys(req.params).forEach(key => {
+                // Usar encodeURIComponent para manejar caracteres especiales en emails
+                const encodedValue = encodeURIComponent(req.params[key]);
+                targetPath = targetPath.replace(`:${key}`, encodedValue);
+            });
+        }
+
+        // Preservar query parameters
+        if (req.query && Object.keys(req.query).length > 0) {
+            const queryParams = new URLSearchParams(req.query).toString();
+            targetPath += `?${queryParams}`;
+        }
+
+        console.log(`[GATEWAY] Path original: ${originalUrl}, Path destino: ${targetPath}`);
+
         const options = {
             hostname: SERVICES.users,
-            path: path,
+            path: targetPath,
             method: method,
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'Connection': 'keep-alive',
-                'User-Agent': 'API-Gateway/1.0',
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
+                'User-Agent': 'API-Gateway/1.0'
             },
             agent: keepAliveAgent,
             timeout: 15000
@@ -88,10 +101,6 @@ function createOptimizedUsersEndpoint(path) {
         const sendResponse = (status, data) => {
             if (!responseSent) {
                 responseSent = true;
-                // Agregar headers de no-cache en la respuesta también
-                res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-                res.setHeader('Pragma', 'no-cache');
-                res.setHeader('Expires', '0');
                 res.status(status).json(data);
             }
         };
@@ -147,7 +156,7 @@ function createOptimizedUsersEndpoint(path) {
     };
 }
 
-// ENDPOINTS OPTIMIZADOS PARA USERS CON CACHE CONTROL
+// ENDPOINTS OPTIMIZADOS PARA USERS - CORREGIDOS
 app.post('/api/users/admins', createOptimizedUsersEndpoint('/users/admins'));
 app.get('/api/users/admins/:id', createOptimizedUsersEndpoint('/users/admins/:id'));
 app.put('/api/users/admins/:id', createOptimizedUsersEndpoint('/users/admins/:id'));
@@ -171,11 +180,11 @@ app.post('/api/users/password/reset-request', createOptimizedUsersEndpoint('/use
 app.post('/api/users/password/verify-code', createOptimizedUsersEndpoint('/users/password/verify-code'));
 app.put('/api/users/password/reset', createOptimizedUsersEndpoint('/users/password/reset'));
 
-// Credentials endpoints
+// Credentials endpoints - CORREGIDOS (manejan emails con caracteres especiales)
 app.get('/api/users/credentials/:email', createOptimizedUsersEndpoint('/users/credentials/:email'));
 app.get('/api/users/credentials/auth', createOptimizedUsersEndpoint('/users/credentials/auth'));
 
-// LOGIN OPTIMIZADO CON CACHE CONTROL
+// LOGIN OPTIMIZADO (MANTENER)
 app.post('/api/auth/login', async (req, res) => {
     const startTime = Date.now();
     console.log(`[GATEWAY] Iniciando login optimizado`);
@@ -188,10 +197,7 @@ app.post('/api/auth/login', async (req, res) => {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Connection': 'keep-alive',
-            'User-Agent': 'API-Gateway/1.0',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
+            'User-Agent': 'API-Gateway/1.0'
         },
         agent: keepAliveAgent,
         timeout: 15000
@@ -202,9 +208,6 @@ app.post('/api/auth/login', async (req, res) => {
     const sendResponse = (status, data) => {
         if (!responseSent) {
             responseSent = true;
-            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-            res.setHeader('Pragma', 'no-cache');
-            res.setHeader('Expires', '0');
             res.status(status).json(data);
         }
     };
@@ -251,33 +254,12 @@ app.post('/api/auth/login', async (req, res) => {
     request.end();
 });
 
-// ENDPOINT PARA LIMPIAR CONEXIONES (útil para desarrollo)
-app.get('/api/clear-connections', (req, res) => {
-    keepAliveAgent.destroy();
-    console.log('Conexiones persistentes limpiadas manualmente');
-    res.json({
-        message: 'Conexiones persistentes limpiadas',
-        timestamp: new Date().toISOString(),
-        cache_cleared: true
-    });
-});
-
-// Proxy normal para endpoints menos críticos CON CACHE CONTROL
+// Proxy normal para endpoints menos críticos
 const proxyOptions = {
     changeOrigin: true,
     timeout: 10000,
     proxyTimeout: 10000,
-    secure: true,
-    onProxyReq: (proxyReq, req, res) => {
-        proxyReq.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        proxyReq.setHeader('Pragma', 'no-cache');
-        proxyReq.setHeader('Expires', '0');
-    },
-    onProxyRes: (proxyRes, req, res) => {
-        proxyRes.headers['cache-control'] = 'no-cache, no-store, must-revalidate';
-        proxyRes.headers['pragma'] = 'no-cache';
-        proxyRes.headers['expires'] = '0';
-    }
+    secure: true
 };
 
 app.use('/api/auth', createProxyMiddleware({
@@ -304,39 +286,31 @@ app.get('/health', (req, res) => {
         status: 'OK',
         optimized: true,
         persistent_connections: true,
-        cache_control: true,
         timestamp: new Date().toISOString()
     });
 });
 
 app.get('/', (req, res) => {
     res.json({
-        message: 'API Gateway - Optimizado con control de cache',
+        message: 'API Gateway - Corregido para manejar caracteres especiales en URLs',
         features: {
             login: 'Conexiones HTTPS persistentes',
-            users: 'Endpoints optimizados con keep-alive',
-            cache_control: 'Headers anti-cache en todas las respuestas',
+            users: 'Endpoints optimizados con encoding correcto',
             performance: 'Timeout 15s, conexiones reutilizables',
-            pre_warmed: true,
-            cache_clear_endpoint: '/api/clear-connections'
+            url_encoding: 'Manejo correcto de caracteres especiales en parámetros',
+            pre_warmed: true
         },
         timestamp: new Date().toISOString()
     });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Gateway ultra-optimizado ejecutándose en puerto ${PORT}`);
-    console.log('Características:');
-    console.log('  - Todos los endpoints con conexiones HTTPS persistentes');
-    console.log('  - Control de cache implementado en todos los endpoints');
-    console.log('  - Pre-calentamiento automático');
-    console.log('  - Timeout optimizado: 15s');
-    console.log('  - Endpoint para limpiar conexiones: /api/clear-connections');
-    console.log('Endpoints optimizados:');
-    console.log('  - /api/users/admins');
-    console.log('  - /api/users/customers');
-    console.log('  - /api/users/sellers');
-    console.log('  - /api/users/password');
-    console.log('  - /api/users/credentials');
-    console.log('  - /api/auth/login');
+    console.log(`Gateway corregido ejecutándose en puerto ${PORT}`);
+    console.log('Mejoras:');
+    console.log('  - Manejo correcto de caracteres especiales en URLs');
+    console.log('  - Encoding automático de parámetros');
+    console.log('  - Logs mejorados para debugging');
+    console.log('Endpoints corregidos:');
+    console.log('  - /api/users/credentials/:email (ahora maneja emails con -, ., etc)');
+    console.log('  - Todos los endpoints con parámetros en URL');
 });
