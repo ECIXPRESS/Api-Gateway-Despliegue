@@ -53,18 +53,36 @@ function preWarmConnections() {
 
 preWarmConnections();
 
-// Función optimizada para endpoints de users
-function createOptimizedUsersEndpoint(path) {
+// Función optimizada para endpoints de users - CORREGIDA
+function createOptimizedUsersEndpoint(basePath) {
     return async (req, res) => {
         const startTime = Date.now();
-        const originalUrl = req.originalUrl;
         const method = req.method;
 
-        console.log(`[GATEWAY] ${method} ${originalUrl} - Iniciando request optimizado`);
+        // CORRECCIÓN CRÍTICA: Construir el path dinámicamente con los parámetros reales
+        let targetPath = basePath;
+
+        // Reemplazar parámetros de la URL con los valores reales (codificados)
+        if (req.params) {
+            Object.keys(req.params).forEach(key => {
+                const paramValue = req.params[key];
+                // CORRECCIÓN: Usar encodeURIComponent para emails y otros parámetros
+                const encodedValue = encodeURIComponent(paramValue);
+                targetPath = targetPath.replace(`:${key}`, encodedValue);
+            });
+        }
+
+        // Preservar query parameters si existen
+        if (Object.keys(req.query).length > 0) {
+            const queryParams = new URLSearchParams(req.query).toString();
+            targetPath += `?${queryParams}`;
+        }
+
+        console.log(`[GATEWAY] ${method} ${req.originalUrl} -> ${targetPath}`);
 
         const options = {
             hostname: SERVICES.users,
-            path: path,
+            path: targetPath,
             method: method,
             headers: {
                 'Content-Type': 'application/json',
@@ -94,7 +112,7 @@ function createOptimizedUsersEndpoint(path) {
 
             response.on('end', () => {
                 const endTime = Date.now();
-                console.log(`[GATEWAY] ${method} ${originalUrl} completado en ${endTime - startTime}ms - Status: ${response.statusCode}`);
+                console.log(`[GATEWAY] ${method} ${req.originalUrl} completado en ${endTime - startTime}ms - Status: ${response.statusCode}`);
 
                 try {
                     if (response.statusCode === 204) {
@@ -114,13 +132,13 @@ function createOptimizedUsersEndpoint(path) {
         });
 
         request.on('timeout', () => {
-            console.log(`[GATEWAY] ${method} ${originalUrl} timeout después de ${Date.now() - startTime}ms`);
+            console.log(`[GATEWAY] ${method} ${req.originalUrl} timeout después de ${Date.now() - startTime}ms`);
             request.destroy();
             sendResponse(504, { error: 'Request timeout - Servicio no responde' });
         });
 
         request.on('error', (err) => {
-            console.log(`[GATEWAY] ${method} ${originalUrl} error en ${Date.now() - startTime}ms:`, err.message);
+            console.log(`[GATEWAY] ${method} ${req.originalUrl} error en ${Date.now() - startTime}ms:`, err.message);
             sendResponse(502, {
                 error: 'Connection failed',
                 message: err.message,
@@ -136,7 +154,7 @@ function createOptimizedUsersEndpoint(path) {
     };
 }
 
-// ENDPOINTS OPTIMIZADOS PARA USERS
+// ENDPOINTS OPTIMIZADOS PARA USERS - CORREGIDOS
 app.post('/api/users/admins', createOptimizedUsersEndpoint('/users/admins'));
 app.get('/api/users/admins/:id', createOptimizedUsersEndpoint('/users/admins/:id'));
 app.put('/api/users/admins/:id', createOptimizedUsersEndpoint('/users/admins/:id'));
@@ -160,7 +178,7 @@ app.post('/api/users/password/reset-request', createOptimizedUsersEndpoint('/use
 app.post('/api/users/password/verify-code', createOptimizedUsersEndpoint('/users/password/verify-code'));
 app.put('/api/users/password/reset', createOptimizedUsersEndpoint('/users/password/reset'));
 
-// Credentials endpoints
+// Credentials endpoints - AHORA FUNCIONARÁN CON EMAILS
 app.get('/api/users/credentials/:email', createOptimizedUsersEndpoint('/users/credentials/:email'));
 app.get('/api/users/credentials/auth', createOptimizedUsersEndpoint('/users/credentials/auth'));
 
@@ -272,11 +290,12 @@ app.get('/health', (req, res) => {
 
 app.get('/', (req, res) => {
     res.json({
-        message: 'API Gateway - Todos los endpoints optimizados con conexiones persistentes',
+        message: 'API Gateway - Corregido para manejar parámetros dinámicos',
         features: {
             login: 'Conexiones HTTPS persistentes',
-            users: 'Endpoints optimizados con keep-alive',
+            users: 'Endpoints optimizados con parámetros dinámicos',
             performance: 'Timeout 15s, conexiones reutilizables',
+            url_encoding: 'Manejo correcto de caracteres especiales',
             pre_warmed: true
         },
         timestamp: new Date().toISOString()
@@ -284,16 +303,12 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Gateway ultra-optimizado ejecutándose en puerto ${PORT}`);
-    console.log('Características:');
-    console.log('  - Todos los endpoints con conexiones HTTPS persistentes');
-    console.log('  - Pre-calentamiento automático');
-    console.log('  - Timeout optimizado: 15s');
-    console.log('Endpoints optimizados:');
-    console.log('  - /api/users/admins');
-    console.log('  - /api/users/customers');
-    console.log('  - /api/users/sellers');
-    console.log('  - /api/users/password');
-    console.log('  - /api/users/credentials');
-    console.log('  - /api/auth/login');
+    console.log(`Gateway corregido ejecutándose en puerto ${PORT}`);
+    console.log('Mejoras:');
+    console.log('  - Manejo dinámico de parámetros en URLs');
+    console.log('  - Encoding automático de caracteres especiales');
+    console.log('  - Preservación de query parameters');
+    console.log('Endpoints que ahora funcionarán:');
+    console.log('  - /api/users/credentials/:email (con emails como manuelalejandro.guarnizo@gmail.com)');
+    console.log('  - Todos los endpoints con parámetros dinámicos');
 });
