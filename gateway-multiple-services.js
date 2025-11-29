@@ -53,8 +53,8 @@ function preWarmConnections() {
 
 preWarmConnections();
 
-// Función optimizada para endpoints de users - CORREGIDA
-function createOptimizedUsersEndpoint(basePath) {
+// Función optimizada para endpoints de users
+function createOptimizedUsersEndpoint(path) {
     return async (req, res) => {
         const startTime = Date.now();
         const originalUrl = req.originalUrl;
@@ -62,29 +62,9 @@ function createOptimizedUsersEndpoint(basePath) {
 
         console.log(`[GATEWAY] ${method} ${originalUrl} - Iniciando request optimizado`);
 
-        // CORRECCIÓN: Construir el path correctamente con los parámetros originales
-        let targetPath = basePath;
-
-        // Preservar los parámetros de la URL original (incluyendo emails con caracteres especiales)
-        if (req.params) {
-            Object.keys(req.params).forEach(key => {
-                // Usar encodeURIComponent para manejar caracteres especiales en emails
-                const encodedValue = encodeURIComponent(req.params[key]);
-                targetPath = targetPath.replace(`:${key}`, encodedValue);
-            });
-        }
-
-        // Preservar query parameters
-        if (req.query && Object.keys(req.query).length > 0) {
-            const queryParams = new URLSearchParams(req.query).toString();
-            targetPath += `?${queryParams}`;
-        }
-
-        console.log(`[GATEWAY] Path original: ${originalUrl}, Path destino: ${targetPath}`);
-
         const options = {
             hostname: SERVICES.users,
-            path: targetPath,
+            path: path,
             method: method,
             headers: {
                 'Content-Type': 'application/json',
@@ -156,7 +136,7 @@ function createOptimizedUsersEndpoint(basePath) {
     };
 }
 
-// ENDPOINTS OPTIMIZADOS PARA USERS - CORREGIDOS
+// ENDPOINTS OPTIMIZADOS PARA USERS
 app.post('/api/users/admins', createOptimizedUsersEndpoint('/users/admins'));
 app.get('/api/users/admins/:id', createOptimizedUsersEndpoint('/users/admins/:id'));
 app.put('/api/users/admins/:id', createOptimizedUsersEndpoint('/users/admins/:id'));
@@ -180,7 +160,7 @@ app.post('/api/users/password/reset-request', createOptimizedUsersEndpoint('/use
 app.post('/api/users/password/verify-code', createOptimizedUsersEndpoint('/users/password/verify-code'));
 app.put('/api/users/password/reset', createOptimizedUsersEndpoint('/users/password/reset'));
 
-// Credentials endpoints - CORREGIDOS (manejan emails con caracteres especiales)
+// Credentials endpoints
 app.get('/api/users/credentials/:email', createOptimizedUsersEndpoint('/users/credentials/:email'));
 app.get('/api/users/credentials/auth', createOptimizedUsersEndpoint('/users/credentials/auth'));
 
@@ -292,12 +272,11 @@ app.get('/health', (req, res) => {
 
 app.get('/', (req, res) => {
     res.json({
-        message: 'API Gateway - Corregido para manejar caracteres especiales en URLs',
+        message: 'API Gateway - Todos los endpoints optimizados con conexiones persistentes',
         features: {
             login: 'Conexiones HTTPS persistentes',
-            users: 'Endpoints optimizados con encoding correcto',
+            users: 'Endpoints optimizados con keep-alive',
             performance: 'Timeout 15s, conexiones reutilizables',
-            url_encoding: 'Manejo correcto de caracteres especiales en parámetros',
             pre_warmed: true
         },
         timestamp: new Date().toISOString()
@@ -305,12 +284,16 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Gateway corregido ejecutándose en puerto ${PORT}`);
-    console.log('Mejoras:');
-    console.log('  - Manejo correcto de caracteres especiales en URLs');
-    console.log('  - Encoding automático de parámetros');
-    console.log('  - Logs mejorados para debugging');
-    console.log('Endpoints corregidos:');
-    console.log('  - /api/users/credentials/:email (ahora maneja emails con -, ., etc)');
-    console.log('  - Todos los endpoints con parámetros en URL');
+    console.log(`Gateway ultra-optimizado ejecutándose en puerto ${PORT}`);
+    console.log('Características:');
+    console.log('  - Todos los endpoints con conexiones HTTPS persistentes');
+    console.log('  - Pre-calentamiento automático');
+    console.log('  - Timeout optimizado: 15s');
+    console.log('Endpoints optimizados:');
+    console.log('  - /api/users/admins');
+    console.log('  - /api/users/customers');
+    console.log('  - /api/users/sellers');
+    console.log('  - /api/users/password');
+    console.log('  - /api/users/credentials');
+    console.log('  - /api/auth/login');
 });
