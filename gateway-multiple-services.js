@@ -126,13 +126,36 @@ const proxyOptions = {
     secure: true
 };
 
-app.use('/api/users', createProxyMiddleware({
+// ENDPOINTS DE USERS - CORREGIDOS
+app.use('/api/users/admins', createProxyMiddleware({
     ...proxyOptions,
     target: `https://${SERVICES.users}`,
-    pathRewrite: { '^/api/users': '/users' },
-    onProxyReq: (proxyReq, req, res) => {
-        console.log(`[GATEWAY] ${req.method} ${req.originalUrl}`);
-    }
+    pathRewrite: { '^/api/users/admins': '/users/admins' }
+}));
+
+app.use('/api/users/customers', createProxyMiddleware({
+    ...proxyOptions,
+    target: `https://${SERVICES.users}`,
+    pathRewrite: { '^/api/users/customers': '/users/customers' }
+}));
+
+app.use('/api/users/sellers', createProxyMiddleware({
+    ...proxyOptions,
+    target: `https://${SERVICES.users}`,
+    pathRewrite: { '^/api/users/sellers': '/users/sellers' }
+}));
+
+app.use('/api/users/password', createProxyMiddleware({
+    ...proxyOptions,
+    target: `https://${SERVICES.users}`,
+    pathRewrite: { '^/api/users/password': '/users/password' }
+}));
+
+// ENDPOINTS EXISTENTES (MANTENER)
+app.use('/api/users/credentials', createProxyMiddleware({
+    ...proxyOptions,
+    target: `https://${SERVICES.users}`,
+    pathRewrite: { '^/api/users/credentials': '/users/credentials' }
 }));
 
 app.use('/api/auth', createProxyMiddleware({
@@ -169,7 +192,16 @@ app.get('/', (req, res) => {
         features: {
             login: 'Conexiones HTTPS persistentes',
             other_endpoints: 'Proxy normal',
-            pre_warmed: true
+            pre_warmed: true,
+            endpoints: [
+                '/api/auth/login',
+                '/api/users/admins',
+                '/api/users/customers',
+                '/api/users/sellers',
+                '/api/users/password',
+                '/api/users/credentials',
+                '/api/notifications'
+            ]
         },
         timestamp: new Date().toISOString()
     });
@@ -181,4 +213,12 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('  - Conexiones HTTPS persistentes');
     console.log('  - Pre-calentamiento automático');
     console.log('  - Timeout optimizado: 15s login, 10s otros');
+    console.log('Endpoints disponibles:');
+    console.log('  - /api/auth/login');
+    console.log('  - /api/users/admins');
+    console.log('  - /api/users/customers');
+    console.log('  - /api/users/sellers');
+    console.log('  - /api/users/password');
+    console.log('  - /api/users/credentials');
+    console.log('  - /api/notifications');
 });
