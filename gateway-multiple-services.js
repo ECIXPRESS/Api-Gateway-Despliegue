@@ -30,141 +30,28 @@ console.log('GATEWAY OPTIMIZADO - CONEXIONES PERSISTENTES');
 function preWarmConnections() {
     console.log('Pre-calentando conexiones persistentes...');
 
-    Object.values(SERVICES).forEach(service => {
-        const preWarmOptions = {
-            hostname: service,
-            path: '/',
-            method: 'HEAD',
-            agent: keepAliveAgent,
-            timeout: 10000
-        };
+    const preWarmOptions = {
+        hostname: SERVICES.auth,
+        path: '/auth/login',
+        method: 'HEAD',
+        agent: keepAliveAgent,
+        timeout: 10000
+    };
 
-        const req = https.request(preWarmOptions, (res) => {
-            console.log(`Conexion pre-calentada con ${service}`);
-        });
-
-        req.on('error', (err) => {
-            console.log(`Pre-calentamiento ${service}: ${err.message}`);
-        });
-
-        req.end();
+    const req = https.request(preWarmOptions, (res) => {
+        console.log('Conexión pre-calentada establecida');
     });
+
+    req.on('error', () => {
+        console.log('Pre-calentamiento completado (ignorando errores)');
+    });
+
+    req.end();
 }
 
 preWarmConnections();
 
-// Función genérica para endpoints optimizados
-function createOptimizedEndpoint(service, basePath) {
-    return async (req, res) => {
-        const startTime = Date.now();
-        const originalUrl = req.originalUrl;
-        const method = req.method;
-
-        console.log(`[GATEWAY] ${method} ${originalUrl} - Iniciando request optimizado`);
-
-        const path = originalUrl.replace('/api', basePath);
-
-        const options = {
-            hostname: service,
-            path: path,
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Connection': 'keep-alive',
-                'User-Agent': 'API-Gateway/1.0'
-            },
-            agent: keepAliveAgent,
-            timeout: 15000
-        };
-
-        return new Promise((resolve) => {
-            const request = https.request(options, (response) => {
-                let data = '';
-
-                response.on('data', (chunk) => {
-                    data += chunk;
-                });
-
-                response.on('end', () => {
-                    const endTime = Date.now();
-                    console.log(`[GATEWAY] ${method} ${originalUrl} completado en ${endTime - startTime}ms - Status: ${response.statusCode}`);
-
-                    try {
-                        // Para DELETE sin contenido
-                        if (response.statusCode === 204) {
-                            return res.status(204).send();
-                        }
-
-                        if (response.statusCode >= 200 && response.statusCode < 300) {
-                            const jsonData = data ? JSON.parse(data) : {};
-                            res.status(response.statusCode).json(jsonData);
-                        } else {
-                            res.status(response.statusCode).json(data ? JSON.parse(data) : { error: 'Unknown error' });
-                        }
-                    } catch (e) {
-                        res.status(502).json({ error: 'Invalid JSON response', details: e.message });
-                    }
-                    resolve();
-                });
-            });
-
-            request.on('timeout', () => {
-                console.log(`[GATEWAY] ${method} ${originalUrl} timeout despues de ${Date.now() - startTime}ms`);
-                request.destroy();
-                res.status(504).json({ error: 'Request timeout - Servicio no responde' });
-                resolve();
-            });
-
-            request.on('error', (err) => {
-                console.log(`[GATEWAY] ${method} ${originalUrl} error en ${Date.now() - startTime}ms:`, err.message);
-                res.status(502).json({
-                    error: 'Connection failed',
-                    message: err.message,
-                    service: service
-                });
-                resolve();
-            });
-
-            // Enviar body si existe
-            if (['POST', 'PUT', 'PATCH'].includes(method) && req.body) {
-                request.write(JSON.stringify(req.body));
-            }
-
-            request.end();
-        });
-    };
-}
-
-// ENDPOINTS OPTIMIZADOS PARA USERS
-app.post('/api/users/admins', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.get('/api/users/admins/:id', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.put('/api/users/admins/:id', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.delete('/api/users/admins/:id', createOptimizedEndpoint(SERVICES.users, '/users'));
-
-app.post('/api/users/customers', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.get('/api/users/customers/:id', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.put('/api/users/customers/:id', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.put('/api/users/customers/:id/password', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.delete('/api/users/customers/:id', createOptimizedEndpoint(SERVICES.users, '/users'));
-
-app.post('/api/users/sellers', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.get('/api/users/sellers/:id', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.get('/api/users/sellers', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.get('/api/users/sellers/pending', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.put('/api/users/sellers/:id', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.delete('/api/users/sellers/:id', createOptimizedEndpoint(SERVICES.users, '/users'));
-
-// ENDPOINTS OPTIMIZADOS PARA PASSWORD RESET
-app.post('/api/users/password/reset-request', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.post('/api/users/password/verify-code', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.put('/api/users/password/reset', createOptimizedEndpoint(SERVICES.users, '/users'));
-
-// ENDPOINTS OPTIMIZADOS PARA CREDENTIALS
-app.get('/api/users/credentials/:email', createOptimizedEndpoint(SERVICES.users, '/users'));
-app.get('/api/users/credentials/auth', createOptimizedEndpoint(SERVICES.users, '/users'));
-
-// LOGIN OPTIMIZADO (MANTENER)
+// LOGIN ULTRA-OPTIMIZADO con HTTPS nativo
 app.post('/api/auth/login', async (req, res) => {
     const startTime = Date.now();
     console.log(`[GATEWAY] Iniciando login optimizado`);
@@ -210,7 +97,7 @@ app.post('/api/auth/login', async (req, res) => {
         });
 
         request.on('timeout', () => {
-            console.log(`[GATEWAY] Login timeout despues de ${Date.now() - startTime}ms`);
+            console.log(`[GATEWAY] Login timeout después de ${Date.now() - startTime}ms`);
             request.destroy();
             res.status(504).json({ error: 'Login timeout - Servicio no responde' });
             resolve();
@@ -225,18 +112,28 @@ app.post('/api/auth/login', async (req, res) => {
             resolve();
         });
 
+        // Enviar body
         request.write(JSON.stringify(req.body));
         request.end();
     });
 });
 
-// Proxy normal para endpoints menos críticos
+// Proxy normal para los demás endpoints (más rápidos)
 const proxyOptions = {
     changeOrigin: true,
     timeout: 10000,
     proxyTimeout: 10000,
     secure: true
 };
+
+app.use('/api/users', createProxyMiddleware({
+    ...proxyOptions,
+    target: `https://${SERVICES.users}`,
+    pathRewrite: { '^/api/users': '/users' },
+    onProxyReq: (proxyReq, req, res) => {
+        console.log(`[GATEWAY] ${req.method} ${req.originalUrl}`);
+    }
+}));
 
 app.use('/api/auth', createProxyMiddleware({
     ...proxyOptions,
@@ -268,11 +165,10 @@ app.get('/health', (req, res) => {
 
 app.get('/', (req, res) => {
     res.json({
-        message: 'API Gateway - Todos los endpoints optimizados con conexiones persistentes',
+        message: 'API Gateway - Optimizado con conexiones persistentes',
         features: {
             login: 'Conexiones HTTPS persistentes',
-            users: 'Endpoints optimizados con keep-alive',
-            performance: 'Timeout 15s, conexiones reutilizables',
+            other_endpoints: 'Proxy normal',
             pre_warmed: true
         },
         timestamp: new Date().toISOString()
@@ -280,16 +176,9 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Gateway ultra-optimizado ejecutandose en puerto ${PORT}`);
-    console.log('Caracteristicas:');
-    console.log('  - Todos los endpoints con conexiones HTTPS persistentes');
-    console.log('  - Pre-calentamiento automatico');
-    console.log('  - Timeout optimizado: 15s');
-    console.log('Endpoints optimizados:');
-    console.log('  - /api/users/admins');
-    console.log('  - /api/users/customers');
-    console.log('  - /api/users/sellers');
-    console.log('  - /api/users/password');
-    console.log('  - /api/users/credentials');
-    console.log('  - /api/auth/login');
+    console.log(`Gateway optimizado ejecutándose en puerto ${PORT}`);
+    console.log('Características:');
+    console.log('  - Conexiones HTTPS persistentes');
+    console.log('  - Pre-calentamiento automático');
+    console.log('  - Timeout optimizado: 15s login, 10s otros');
 });
