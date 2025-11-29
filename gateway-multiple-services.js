@@ -30,23 +30,25 @@ console.log('GATEWAY OPTIMIZADO - CONEXIONES PERSISTENTES');
 function preWarmConnections() {
     console.log('Pre-calentando conexiones persistentes...');
 
-    const preWarmOptions = {
-        hostname: SERVICES.auth,
-        path: '/auth/login',
-        method: 'HEAD',
-        agent: keepAliveAgent,
-        timeout: 10000
-    };
+    Object.values(SERVICES).forEach(service => {
+        const preWarmOptions = {
+            hostname: service,
+            path: '/',
+            method: 'HEAD',
+            agent: keepAliveAgent,
+            timeout: 10000
+        };
 
-    const req = https.request(preWarmOptions, (res) => {
-        console.log('Conexión pre-calentada establecida');
+        const req = https.request(preWarmOptions, (res) => {
+            console.log(`Conexion pre-calentada con ${service}`);
+        });
+
+        req.on('error', (err) => {
+            console.log(`Pre-calentamiento ${service}: ${err.message}`);
+        });
+
+        req.end();
     });
-
-    req.on('error', () => {
-        console.log('Pre-calentamiento completado (ignorando errores)');
-    });
-
-    req.end();
 }
 
 preWarmConnections();
@@ -97,7 +99,7 @@ app.post('/api/auth/login', async (req, res) => {
         });
 
         request.on('timeout', () => {
-            console.log(`[GATEWAY] Login timeout después de ${Date.now() - startTime}ms`);
+            console.log(`[GATEWAY] Login timeout despues de ${Date.now() - startTime}ms`);
             request.destroy();
             res.status(504).json({ error: 'Login timeout - Servicio no responde' });
             resolve();
@@ -118,15 +120,29 @@ app.post('/api/auth/login', async (req, res) => {
     });
 });
 
-// Proxy normal para los demás endpoints (más rápidos)
+// Proxy normal para los demas endpoints con mejor manejo de errores
 const proxyOptions = {
     changeOrigin: true,
-    timeout: 10000,
-    proxyTimeout: 10000,
-    secure: true
+    timeout: 15000,
+    proxyTimeout: 15000,
+    secure: true,
+    onError: (err, req, res) => {
+        console.error(`[HPM] Error en proxy ${req.method} ${req.originalUrl}:`, err.message);
+        res.status(503).json({
+            error: 'Service temporarily unavailable',
+            message: 'El servicio backend no esta respondiendo',
+            service: req.originalUrl
+        });
+    },
+    onProxyReq: (proxyReq, req, res) => {
+        console.log(`[GATEWAY] ${req.method} ${req.originalUrl} -> ${proxyReq.getHeader('host')}${req.originalUrl}`);
+    },
+    onProxyRes: (proxyRes, req, res) => {
+        console.log(`[GATEWAY] ${req.method} ${req.originalUrl} <- ${proxyRes.statusCode}`);
+    }
 };
 
-// ENDPOINTS DE USERS - CORREGIDOS
+// ENDPOINTS DE USERS
 app.use('/api/users/admins', createProxyMiddleware({
     ...proxyOptions,
     target: `https://${SERVICES.users}`,
@@ -208,10 +224,10 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Gateway optimizado ejecutándose en puerto ${PORT}`);
-    console.log('Características:');
+    console.log(`Gateway optimizado ejecutandose en puerto ${PORT}`);
+    console.log('Caracteristicas:');
     console.log('  - Conexiones HTTPS persistentes');
-    console.log('  - Pre-calentamiento automático');
+    console.log('  - Pre-calentamiento automatico');
     console.log('  - Timeout optimizado: 15s login, 10s otros');
     console.log('Endpoints disponibles:');
     console.log('  - /api/auth/login');
