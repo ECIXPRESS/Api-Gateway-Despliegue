@@ -36,7 +36,11 @@ function preWarmConnections() {
             path: '/',
             method: 'HEAD',
             agent: keepAliveAgent,
-            timeout: 10000
+            timeout: 10000,
+            headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
         };
 
         const req = https.request(preWarmOptions, (res) => {
@@ -53,7 +57,7 @@ function preWarmConnections() {
 
 preWarmConnections();
 
-// Función optimizada para endpoints de users
+// Función optimizada para endpoints de users CON CACHE CONTROL
 function createOptimizedUsersEndpoint(path) {
     return async (req, res) => {
         const startTime = Date.now();
@@ -70,7 +74,10 @@ function createOptimizedUsersEndpoint(path) {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'Connection': 'keep-alive',
-                'User-Agent': 'API-Gateway/1.0'
+                'User-Agent': 'API-Gateway/1.0',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
             },
             agent: keepAliveAgent,
             timeout: 15000
@@ -81,6 +88,10 @@ function createOptimizedUsersEndpoint(path) {
         const sendResponse = (status, data) => {
             if (!responseSent) {
                 responseSent = true;
+                // Agregar headers de no-cache en la respuesta también
+                res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+                res.setHeader('Pragma', 'no-cache');
+                res.setHeader('Expires', '0');
                 res.status(status).json(data);
             }
         };
@@ -136,7 +147,7 @@ function createOptimizedUsersEndpoint(path) {
     };
 }
 
-// ENDPOINTS OPTIMIZADOS PARA USERS
+// ENDPOINTS OPTIMIZADOS PARA USERS CON CACHE CONTROL
 app.post('/api/users/admins', createOptimizedUsersEndpoint('/users/admins'));
 app.get('/api/users/admins/:id', createOptimizedUsersEndpoint('/users/admins/:id'));
 app.put('/api/users/admins/:id', createOptimizedUsersEndpoint('/users/admins/:id'));
@@ -164,7 +175,7 @@ app.put('/api/users/password/reset', createOptimizedUsersEndpoint('/users/passwo
 app.get('/api/users/credentials/:email', createOptimizedUsersEndpoint('/users/credentials/:email'));
 app.get('/api/users/credentials/auth', createOptimizedUsersEndpoint('/users/credentials/auth'));
 
-// LOGIN OPTIMIZADO (MANTENER)
+// LOGIN OPTIMIZADO CON CACHE CONTROL
 app.post('/api/auth/login', async (req, res) => {
     const startTime = Date.now();
     console.log(`[GATEWAY] Iniciando login optimizado`);
@@ -177,7 +188,10 @@ app.post('/api/auth/login', async (req, res) => {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Connection': 'keep-alive',
-            'User-Agent': 'API-Gateway/1.0'
+            'User-Agent': 'API-Gateway/1.0',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
         },
         agent: keepAliveAgent,
         timeout: 15000
@@ -188,6 +202,9 @@ app.post('/api/auth/login', async (req, res) => {
     const sendResponse = (status, data) => {
         if (!responseSent) {
             responseSent = true;
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
             res.status(status).json(data);
         }
     };
@@ -234,12 +251,33 @@ app.post('/api/auth/login', async (req, res) => {
     request.end();
 });
 
-// Proxy normal para endpoints menos críticos
+// ENDPOINT PARA LIMPIAR CONEXIONES (útil para desarrollo)
+app.get('/api/clear-connections', (req, res) => {
+    keepAliveAgent.destroy();
+    console.log('Conexiones persistentes limpiadas manualmente');
+    res.json({
+        message: 'Conexiones persistentes limpiadas',
+        timestamp: new Date().toISOString(),
+        cache_cleared: true
+    });
+});
+
+// Proxy normal para endpoints menos críticos CON CACHE CONTROL
 const proxyOptions = {
     changeOrigin: true,
     timeout: 10000,
     proxyTimeout: 10000,
-    secure: true
+    secure: true,
+    onProxyReq: (proxyReq, req, res) => {
+        proxyReq.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        proxyReq.setHeader('Pragma', 'no-cache');
+        proxyReq.setHeader('Expires', '0');
+    },
+    onProxyRes: (proxyRes, req, res) => {
+        proxyRes.headers['cache-control'] = 'no-cache, no-store, must-revalidate';
+        proxyRes.headers['pragma'] = 'no-cache';
+        proxyRes.headers['expires'] = '0';
+    }
 };
 
 app.use('/api/auth', createProxyMiddleware({
@@ -266,18 +304,21 @@ app.get('/health', (req, res) => {
         status: 'OK',
         optimized: true,
         persistent_connections: true,
+        cache_control: true,
         timestamp: new Date().toISOString()
     });
 });
 
 app.get('/', (req, res) => {
     res.json({
-        message: 'API Gateway - Todos los endpoints optimizados con conexiones persistentes',
+        message: 'API Gateway - Optimizado con control de cache',
         features: {
             login: 'Conexiones HTTPS persistentes',
             users: 'Endpoints optimizados con keep-alive',
+            cache_control: 'Headers anti-cache en todas las respuestas',
             performance: 'Timeout 15s, conexiones reutilizables',
-            pre_warmed: true
+            pre_warmed: true,
+            cache_clear_endpoint: '/api/clear-connections'
         },
         timestamp: new Date().toISOString()
     });
@@ -287,8 +328,10 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`Gateway ultra-optimizado ejecutándose en puerto ${PORT}`);
     console.log('Características:');
     console.log('  - Todos los endpoints con conexiones HTTPS persistentes');
+    console.log('  - Control de cache implementado en todos los endpoints');
     console.log('  - Pre-calentamiento automático');
     console.log('  - Timeout optimizado: 15s');
+    console.log('  - Endpoint para limpiar conexiones: /api/clear-connections');
     console.log('Endpoints optimizados:');
     console.log('  - /api/users/admins');
     console.log('  - /api/users/customers');
