@@ -22,7 +22,8 @@ const keepAliveAgent = new https.Agent({
 const SERVICES = {
     auth: 'tsukuyomi-authentication-dev-h9ajhmhre8gxhzcp.eastus2-01.azurewebsites.net',
     users: 'tsukuyomi-users-dev-f2dzeqangrebakdw.eastus2-01.azurewebsites.net',
-    notifications: 'tsukuyomi-notifications-dev-gmctdechaqf5fqaj.eastus2-01.azurewebsites.net'
+    notifications: 'tsukuyomi-notifications-dev-gmctdechaqf5fqaj.eastus2-01.azurewebsites.net',
+    chat: 'tsukuyomi-chat-dev-a7dcckcvdra5c3g6.eastus2-01.azurewebsites.net'
 };
 
 console.log('GATEWAY OPTIMIZADO - CONEXIONES PERSISTENTES');
@@ -304,6 +305,30 @@ app.post('/api/auth/login', async (req, res) => {
     request.end();
 });
 
+//  WEBSOCKET PROXY - DEBE IR ANTES DE LOS PROXIES NORMALES
+app.use('/ws', createProxyMiddleware({
+    target: `https://${SERVICES.chat}`,
+    ws: true, // ⭐ HABILITAR WEBSOCKET
+    changeOrigin: true,
+    secure: false, // false para desarrollo
+    logLevel: 'debug',
+    pathRewrite: { '^/ws': '/ws' },
+    onProxyReqWs: (proxyReq, req, socket) => {
+        console.log('[GATEWAY-WS] WebSocket upgrade a:', SERVICES.chat);
+        console.log('[GATEWAY-WS] URL original:', req.url);
+    },
+    onOpen: (proxySocket) => {
+        console.log('[GATEWAY-WS] WebSocket conexión abierta');
+    },
+    onClose: (res, socket, head) => {
+        console. log('[GATEWAY-WS] WebSocket conexión cerrada');
+    },
+    onError: (err, req, res) => {
+        console.error('[GATEWAY-WS] WebSocket error:', err.message);
+        console.error('[GATEWAY-WS] Error code:', err.code);
+    }
+}));
+
 // Proxy normal para otros endpoints
 const proxyOptions = {
     changeOrigin: true,
@@ -336,6 +361,20 @@ app.use('/api/notifications', createProxyMiddleware({
     ...proxyOptions,
     target: `https://${SERVICES.notifications}`,
     pathRewrite: { '^/api/notifications': '/notifications' }
+}));
+
+// PROXY HTTP DE CHAT
+app.use('/api/chat', createProxyMiddleware({
+    ...proxyOptions,
+    target: `https://${SERVICES.chat}`,
+    pathRewrite: { '^/api/chat': '' },
+    onProxyReq:  (proxyReq, req, res) => {
+        console. log(`[PROXY-CHAT] ${req.method} ${req.originalUrl} -> ${SERVICES.chat}`);
+    },
+    onError: (err, req, res) => {
+        console.error(`[PROXY-CHAT ERROR] ${req.method} ${req.originalUrl}:`, err.message);
+        res.status(502).json({ error: 'Chat proxy error', details: err.message });
+    }
 }));
 
 // Health check mejorado
@@ -397,12 +436,15 @@ app.get('/', (req, res) => {
         features: {
             timeout: '30 segundos',
             persistent_connections: true,
+            websocket: 'habilitado',
             error_handling: 'mejorado',
             debug_logging: 'habilitado'
         },
         endpoints: {
             customers: 'POST /api/users/customers (funcional)',
             login: 'POST /api/auth/login (optimizado)',
+            chat: 'POST /api/chat/* (HTTP y WebSocket)', 
+            websocket: 'WS /ws (tiempo real)',
             health: 'GET /health (con verificación de servicios)'
         },
         timestamp: new Date().toISOString()
@@ -417,9 +459,12 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('   • Mejor manejo de errores ECONNRESET');
     console.log('   • Logging detallado para debug');
     console.log('   • Health check con verificación de servicios');
+    console.log('   • WebSocket proxy habilitado');
     console.log('');
     console.log('📡 Endpoints disponibles:');
     console.log('   POST /api/users/customers - Crear customer');
     console.log('   POST /api/auth/login - Login optimizado');
+    console.log('   POST /api/chat/* - Endpoints de chat'); 
+    console.log('   WS /ws - WebSocket para chat en tiempo real'); 
     console.log('   GET /health - Estado del sistema');
 });
