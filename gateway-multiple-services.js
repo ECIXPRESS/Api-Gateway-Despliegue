@@ -20,9 +20,10 @@ const keepAliveAgent = new https.Agent({
 });
 
 const SERVICES = {
-    auth: 'tsukuyomi-authentication-dev-h9ajhmhre8gxhzcp.eastus2-01.azurewebsites.net',
-    users: 'tsukuyomi-users-dev-f2dzeqangrebakdw.eastus2-01.azurewebsites.net',
-    notifications: 'tsukuyomi-notifications-dev-gmctdechaqf5fqaj.eastus2-01.azurewebsites.net'
+    auth:  'tsukuyomi-authentication-dev-h9ajhmhre8gxhzcp. eastus2-01.azurewebsites.net',
+    users: 'tsukuyomi-users-dev-f2dzeqangrebakdw. eastus2-01.azurewebsites.net',
+    notifications: 'tsukuyomi-notifications-dev-gmctdechaqf5fqaj.eastus2-01.azurewebsites.net',
+    chat: 'tsukuyomi-chat-dev-a7dcckcvdra5c3g6.eastus2-01.azurewebsites. net' // ⭐ AÑADIDO
 };
 
 console.log('GATEWAY OPTIMIZADO - CONEXIONES PERSISTENTES');
@@ -38,7 +39,7 @@ function preWarmConnections() {
             method: 'HEAD',
             agent: keepAliveAgent,
             rejectUnauthorized: false,  // Añadido para desarrollo
-            timeout: 10000
+            timeout:  10000
         };
 
         const req = https.request(preWarmOptions, (res) => {
@@ -46,7 +47,7 @@ function preWarmConnections() {
         });
 
         req.on('error', (err) => {
-            console.log(`⚠ Pre-calentamiento ${service}: ${err.message}`);
+            console. log(`⚠ Pre-calentamiento ${service}:  ${err.message}`);
         });
 
         req.end();
@@ -94,7 +95,7 @@ function createOptimizedUsersEndpoint(basePath) {
             headers: headers,
             agent: keepAliveAgent,
             timeout: 30000,  // Aumentado a 30s
-            rejectUnauthorized: false  // Para desarrollo
+            rejectUnauthorized:  false  // Para desarrollo
         };
 
         let responseSent = false;
@@ -133,18 +134,18 @@ function createOptimizedUsersEndpoint(basePath) {
                         sendResponse(response.statusCode, errorData);
                     }
                 } catch (e) {
-                    console.error(`[GATEWAY] Error parsing response:`, e.message);
+                    console.error(`[GATEWAY] Error parsing response: `, e.message);
                     sendResponse(502, {
                         error: 'Invalid JSON response',
                         details: e.message,
-                        rawResponse: data.substring(0, 500) // Log parcial para debug
+                        rawResponse: data. substring(0, 500) // Log parcial para debug
                     });
                 }
             });
         });
 
         request.on('timeout', () => {
-            console.error(`[GATEWAY] ${method} ${req.originalUrl} timeout después de ${Date.now() - startTime}ms`);
+            console. error(`[GATEWAY] ${method} ${req.originalUrl} timeout después de ${Date.now() - startTime}ms`);
             request.destroy();
             sendResponse(504, {
                 error: 'Request timeout',
@@ -181,7 +182,7 @@ function createOptimizedUsersEndpoint(basePath) {
         // CORRECCIÓN CRÍTICA: Manejar el body correctamente
         if (['POST', 'PUT', 'PATCH'].includes(method) && req.body) {
             const bodyData = JSON.stringify(req.body);
-            console.log(`[GATEWAY] Enviando body:`, JSON.stringify(req.body, null, 2));
+            console.log(`[GATEWAY] Enviando body: `, JSON.stringify(req.body, null, 2));
 
             // Añadir Content-Length header
             headers['Content-Length'] = Buffer.byteLength(bodyData);
@@ -208,16 +209,16 @@ app.get('/api/users/customers', createOptimizedUsersEndpoint('/users/customers')
 
 // Otros endpoints...
 app.post('/api/users/admins', createOptimizedUsersEndpoint('/users/admins'));
-app.get('/api/users/admins/:id', createOptimizedUsersEndpoint('/users/admins/:id'));
+app.get('/api/users/admins/: id', createOptimizedUsersEndpoint('/users/admins/: id'));
 app.put('/api/users/admins/:id', createOptimizedUsersEndpoint('/users/admins/:id'));
 app.delete('/api/users/admins/:id', createOptimizedUsersEndpoint('/users/admins/:id'));
 
 app.post('/api/users/sellers', createOptimizedUsersEndpoint('/users/sellers'));
-app.get('/api/users/sellers/:id', createOptimizedUsersEndpoint('/users/sellers/:id'));
+app.get('/api/users/sellers/:id', createOptimizedUsersEndpoint('/users/sellers/: id'));
 app.get('/api/users/sellers', createOptimizedUsersEndpoint('/users/sellers'));
 app.get('/api/users/sellers/pending', createOptimizedUsersEndpoint('/users/sellers/pending'));
 app.put('/api/users/sellers/:id', createOptimizedUsersEndpoint('/users/sellers/:id'));
-app.delete('/api/users/sellers/:id', createOptimizedUsersEndpoint('/users/sellers/:id'));
+app.delete('/api/users/sellers/: id', createOptimizedUsersEndpoint('/users/sellers/:id'));
 
 // Password endpoints
 app.post('/api/users/password/reset-request', createOptimizedUsersEndpoint('/users/password/reset-request'));
@@ -225,7 +226,7 @@ app.post('/api/users/password/verify-code', createOptimizedUsersEndpoint('/users
 app.put('/api/users/password/reset', createOptimizedUsersEndpoint('/users/password/reset'));
 
 // Credentials endpoints
-app.get('/api/users/credentials/:email', createOptimizedUsersEndpoint('/users/credentials/:email'));
+app.get('/api/users/credentials/: email', createOptimizedUsersEndpoint('/users/credentials/:email'));
 app.get('/api/users/credentials/auth', createOptimizedUsersEndpoint('/users/credentials/auth'));
 
 // LOGIN OPTIMIZADO (con las mismas mejoras)
@@ -241,7 +242,7 @@ app.post('/api/auth/login', async (req, res) => {
     };
 
     const options = {
-        hostname: SERVICES.auth,
+        hostname:  SERVICES.auth,
         path: '/auth/login',
         method: 'POST',
         headers: headers,
@@ -292,7 +293,7 @@ app.post('/api/auth/login', async (req, res) => {
         console.error(`[GATEWAY] Login error en ${Date.now() - startTime}ms:`, err.message);
         sendResponse(502, {
             error: 'Connection failed',
-            message: err.message,
+            message: err. message,
             code: err.code
         });
     });
@@ -304,6 +305,30 @@ app.post('/api/auth/login', async (req, res) => {
     request.end();
 });
 
+// ⭐ WEBSOCKET PROXY - AÑADIDO
+app.use('/ws', createProxyMiddleware({
+    target: `https://${SERVICES.chat}`,
+    ws: true,
+    changeOrigin: true,
+    secure: false,
+    logLevel:  'debug',
+    pathRewrite: { '^/ws': '/ws' },
+    onProxyReqWs: (proxyReq, req, socket) => {
+        console.log('[GATEWAY-WS] WebSocket upgrade a:', SERVICES.chat);
+        console.log('[GATEWAY-WS] URL original:', req.url);
+    },
+    onOpen: (proxySocket) => {
+        console.log('[GATEWAY-WS] WebSocket conexión abierta');
+    },
+    onClose: (res, socket, head) => {
+        console. log('[GATEWAY-WS] WebSocket conexión cerrada');
+    },
+    onError: (err, req, res) => {
+        console.error('[GATEWAY-WS] WebSocket error:', err.message);
+        console.error('[GATEWAY-WS] Error code:', err.code);
+    }
+}));
+
 // Proxy normal para otros endpoints
 const proxyOptions = {
     changeOrigin: true,
@@ -314,8 +339,8 @@ const proxyOptions = {
 };
 
 app.use('/api/auth', createProxyMiddleware({
-    ...proxyOptions,
-    target: `https://${SERVICES.auth}`,
+    ... proxyOptions,
+    target:  `https://${SERVICES.auth}`,
     pathRewrite: { '^/api/auth': '/auth' },
     onProxyReq: (proxyReq, req, res) => {
         console.log(`[PROXY] ${req.method} ${req.originalUrl} -> ${SERVICES.auth}`);
@@ -335,7 +360,21 @@ app.use('/api/user-info', createProxyMiddleware({
 app.use('/api/notifications', createProxyMiddleware({
     ...proxyOptions,
     target: `https://${SERVICES.notifications}`,
-    pathRewrite: { '^/api/notifications': '/notifications' }
+    pathRewrite: { '^/api/notifications':  '/notifications' }
+}));
+
+// ⭐ PROXY HTTP CHAT - AÑADIDO
+app. use('/api/chat', createProxyMiddleware({
+    ... proxyOptions,
+    target:  `https://${SERVICES.chat}`,
+    pathRewrite: { '^/api/chat':  '' },
+    onProxyReq: (proxyReq, req, res) => {
+        console.log(`[PROXY-CHAT] ${req.method} ${req.originalUrl} -> ${SERVICES.chat}`);
+    },
+    onError: (err, req, res) => {
+        console.error(`[PROXY-CHAT ERROR] ${req. method} ${req.originalUrl}:`, err.message);
+        res.status(502).json({ error: 'Chat proxy error', details: err.message });
+    }
 }));
 
 // Health check mejorado
@@ -362,7 +401,7 @@ app.get('/health', async (req, res) => {
                 }, (res) => {
                     healthChecks.services[name] = {
                         status: 'OK',
-                        responseTime: Date.now() - startTime,
+                        responseTime:  Date.now() - startTime,
                         statusCode: res.statusCode
                     };
                     resolve();
@@ -392,17 +431,20 @@ app.get('/health', async (req, res) => {
 
 app.get('/', (req, res) => {
     res.json({
-        message: 'API Gateway - Optimizado y Corregido',
+        message: 'API Gateway - Optimizado con WebSocket', // ⭐ ACTUALIZADO
         status: 'operational',
         features: {
             timeout: '30 segundos',
             persistent_connections: true,
-            error_handling: 'mejorado',
+            websocket:  'habilitado', // ⭐ AÑADIDO
+            error_handling:  'mejorado',
             debug_logging: 'habilitado'
         },
         endpoints: {
             customers: 'POST /api/users/customers (funcional)',
             login: 'POST /api/auth/login (optimizado)',
+            chat: 'POST /api/chat/* (HTTP y WebSocket)', // ⭐ AÑADIDO
+            websocket: 'WS /ws (tiempo real)', // ⭐ AÑADIDO
             health: 'GET /health (con verificación de servicios)'
         },
         timestamp: new Date().toISOString()
@@ -417,9 +459,12 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('   • Mejor manejo de errores ECONNRESET');
     console.log('   • Logging detallado para debug');
     console.log('   • Health check con verificación de servicios');
+    console.log('   • WebSocket proxy habilitado'); // ⭐ AÑADIDO
     console.log('');
     console.log('📡 Endpoints disponibles:');
     console.log('   POST /api/users/customers - Crear customer');
     console.log('   POST /api/auth/login - Login optimizado');
+    console.log('   POST /api/chat/* - Endpoints de chat'); // ⭐ AÑADIDO
+    console.log('   WS /ws - WebSocket para chat en tiempo real'); // ⭐ AÑADIDO
     console.log('   GET /health - Estado del sistema');
 });
